@@ -1135,7 +1135,7 @@ pub inline fn registerMethod(
             .method_flags = @bitCast(info.flags),
             .has_return_value = @intFromBool(info.return_value_info != null),
             .return_value_info = @ptrCast(info.return_value_info),
-            .return_value_metadata = @intFromEnum(info.return_value_metadata),
+            .return_value_metadata = @intCast(@intFromEnum(info.return_value_metadata)),
             .argument_count = @intCast(info.argument_info.len),
             .arguments_info = if (info.argument_info.len > 0) @ptrCast(@constCast(info.argument_info.ptr)) else null,
             .arguments_metadata = if (info.argument_metadata.len > 0) @ptrCast(@constCast(info.argument_metadata.ptr)) else null,

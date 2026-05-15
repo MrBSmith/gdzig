@@ -189,7 +189,7 @@ fn writeBuiltinConstructor(w: *CodeWriter, builtin_name: []const u8, constructor
     } else {
         try w.printLine(
             \\if ({0s}_ptr == null) {{
-            \\    {0s}_ptr = raw.variantGetPtrConstructor(@intFromEnum(Variant.Tag.forType({2s})), {1d});
+            \\    {0s}_ptr = raw.variantGetPtrConstructor(@intCast(@intFromEnum(Variant.Tag.forType({2s}))), {1d});
             \\}}
             \\{0s}_ptr.?(@ptrCast(&result), @ptrCast(&args));
         , .{
@@ -210,7 +210,7 @@ fn writeBuiltinDestructor(w: *CodeWriter, builtin: *const Context.Builtin) !void
     try w.printLine(
         \\pub fn deinit(self: *{0s}) void {{
         \\    if (deinit_ptr == null) {{
-        \\        deinit_ptr = raw.variantGetPtrDestructor(@intFromEnum(Variant.Tag.forType({0s}))).?;
+        \\        deinit_ptr = raw.variantGetPtrDestructor(@intCast(@intFromEnum(Variant.Tag.forType({0s})))).?;
         \\    }}
         \\    deinit_ptr.?(@ptrCast(self));
         \\}}
@@ -226,7 +226,7 @@ fn writeBuiltinMethod(w: *CodeWriter, builtin_name: []const u8, method: *const C
 
     try w.printLine(
         \\if ({0s}_ptr == null) {{
-        \\    {0s}_ptr = raw.variantGetPtrBuiltinMethod(@intFromEnum(Variant.Tag.forType({3s})), @ptrCast(&StringName.fromComptimeLatin1("{1s}")), {2d}).?;
+        \\    {0s}_ptr = raw.variantGetPtrBuiltinMethod(@intCast(@intFromEnum(Variant.Tag.forType({3s}))), @ptrCast(&StringName.fromComptimeLatin1("{1s}")), {2d}).?;
         \\}}
         \\{0s}_ptr.?({4s}, @ptrCast(&args), {5s}, args.len);
     , .{
@@ -255,13 +255,13 @@ fn writeBuiltinOperator(w: *CodeWriter, builtin_name: []const u8, operator: *con
     // Lookup the method
     try w.print(
         \\if ({0s}_ptr == null) {{
-        \\    {0s}_ptr = raw.variantGetPtrOperatorEvaluator(@intFromEnum(Variant.Operator.{1s}), @intFromEnum(Variant.Tag.forType({2s})),
+        \\    {0s}_ptr = raw.variantGetPtrOperatorEvaluator(@intCast(@intFromEnum(Variant.Operator.{1s})), @intFromEnum(Variant.Tag.forType({2s})),
     , .{ operator.name, operator.operator_name.?, builtin_name });
     w.indent += 1;
     if (operator.parameters.getPtr("rhs")) |rhs| {
-        try w.writeAll(" @intFromEnum(Variant.Tag.forType(");
+        try w.writeAll(" @intCast(@intFromEnum(Variant.Tag.forType(");
         try writeTypeAtField(w, &rhs.type, null, ctx);
-        try w.writeAll("))");
+        try w.writeAll(")))");
     } else {
         try w.writeAll(" null");
     }
