@@ -242,7 +242,7 @@ pub fn Class(comptime T: type) type {
         }
 
         /// Register an enum type. Must be `enum(i32)`.
-        pub fn addEnum(self: *Self, comptime E: type) void {
+        pub fn addEnum(self: *Self, comptime E: type, enum_name: []const u8) void {
             const info = @typeInfo(E);
             if (info != .@"enum") {
                 @compileError("addEnum requires an enum type, got " ++ @typeName(E));
@@ -252,7 +252,6 @@ pub fn Class(comptime T: type) type {
             }
 
             const alloc = self.allocator();
-            const enum_name = @typeName(E);
             // Get just the type name without module path
             const short_name = blk: {
                 var i = enum_name.len;
