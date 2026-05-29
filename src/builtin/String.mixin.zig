@@ -22,7 +22,7 @@ pub inline fn assumeFromUtf8(str: []const u8) String {
 /// **Since Godot 4.3**
 pub inline fn fromUtf8(cstr: []const u8) !String {
     var result: String = undefined;
-    const err = raw.stringNewWithUtf8CharsAndLen2(result.ptr(), @ptrCast(cstr.ptr), @intCast(cstr.len));
+    const err = raw.stringNewWithUtf8CharsAndLen2.?(result.ptr(), @ptrCast(cstr.ptr), @intCast(cstr.len));
     if (err != 0) {
         return error.Full;
     }

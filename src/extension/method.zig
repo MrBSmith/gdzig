@@ -62,7 +62,7 @@ pub fn MethodConfig(comptime Class: type) type {
             const ReturnType = fn_info.return_type orelse void;
             const arg_count = Args.len - 1;
 
-            const return_value: classdb.PropertyInfo = .{
+            const return_value : ?classdb.PropertyInfo = if (ReturnType == Variant) null else classdb.PropertyInfo{
                 .type = .forType(ReturnType),
             };
 
@@ -133,11 +133,19 @@ pub fn MethodConfig(comptime Class: type) type {
                 }
             };
 
+            const return_info : ?*classdb.PropertyInfo = if (ReturnType != void) blk: {
+                if (return_value != null) {
+                    break :blk @constCast(&return_value.?);
+                } else {
+                    break :blk null;
+                }
+            } else null;
+
             return .{
                 .name = name,
                 .return_type = ReturnType,
                 .flags = options.flags,
-                .return_value_info = if (ReturnType != void) @constCast(&return_value) else null,
+                .return_value_info = return_info,
                 .argument_info = @constCast(&arg_infos),
                 .argument_metadata = @constCast(&arg_metas),
                 .default_arguments = options.default_arguments,
