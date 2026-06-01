@@ -1,5 +1,4 @@
-pub fn registerClass(comptime T: type, info: ClassInfo4(ClassUserdataOf(T))) void {
-    const class_name: StringName = .fromType(T);
+pub fn registerClassWithName(comptime T: type, info: ClassInfo4(ClassUserdataOf(T)), class_name: StringName) void {
     const base_name: StringName = .fromType(class.BaseOf(T));
     const callbacks = comptime makeClassCallbacks(T);
     const Userdata = ClassUserdataOf(T);
@@ -53,6 +52,12 @@ pub fn registerClass(comptime T: type, info: ClassInfo4(ClassUserdataOf(T))) voi
     } else {
         @panic("Unsupported Godot version");
     }
+}
+
+
+pub fn registerClass(comptime T: type, info: ClassInfo4(ClassUserdataOf(T))) void {
+    const class_name: StringName = .fromType(T);
+    registerClassWithName(T, info, class_name);
 }
 
 /// Extracts the `ClassUserdata` type from a type `T` by inspecting its `create` function.

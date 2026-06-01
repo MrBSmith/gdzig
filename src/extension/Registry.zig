@@ -36,7 +36,7 @@ pub fn addClass(self: *Registry, comptime T: type, userdata: ClassUserdataValue(
 }
 
 /// Create a class and return it for further configuration.
-pub fn createClass(self: *Registry, comptime T: type, userdata: ClassUserdataValue(T), options: Class(T).CreateOptions) *Class(T) {
+pub fn createClassWithName(self: *Registry, comptime T: type, userdata: ClassUserdataValue(T), options: Class(T).CreateOptions, name: []const u8) *Class(T) {
     const alloc = self.arena.allocator();
     const Userdata = class_mod.ClassUserdataOf(T);
 
@@ -51,9 +51,14 @@ pub fn createClass(self: *Registry, comptime T: type, userdata: ClassUserdataVal
     };
 
     const class_builder = alloc.create(Class(T)) catch @panic("OOM");
-    class_builder.* = Class(T).init(self, stored_userdata, options);
+    class_builder.* = Class(T).init(self, stored_userdata, options, name);
     self.classes.append(alloc, class_builder.erased()) catch @panic("OOM");
     return class_builder;
+}
+
+/// Create a class and return it for further configuration.
+pub fn createClass(self: *Registry, comptime T: type, userdata: ClassUserdataValue(T), options: Class(T).CreateOptions) *Class(T) {
+    return self.createClassWithName(T, userdata, options, &.{});
 }
 
 /// Add a module. The module must have a `pub fn register(r: *Registry) void` function.
@@ -131,10 +136,13 @@ pub fn Class(comptime T: type) type {
             is_runtime: bool = false,
             /// Custom icon path for the editor. Requires Godot 4.4+.
             icon_path: ?*const String = null,
+            /// Custom name
+            name : []const u8 = &.{},
 
             pub const auto: CreateOptions = .{};
         };
 
+        name : []const u8 = &.{},
         any: AnyClass,
         registry: *Registry,
         userdata: class_mod.ClassUserdataOf(T),
@@ -158,11 +166,12 @@ pub fn Class(comptime T: type) type {
         /// Custom icon path for the editor. Requires Godot 4.4+.
         icon_path: ?*const String,
 
-        pub fn init(registry: *Registry, userdata: class_mod.ClassUserdataOf(T), options: CreateOptions) Self {
+        pub fn init(registry: *Registry, userdata: class_mod.ClassUserdataOf(T), options: CreateOptions, name: []const u8) Self {
             return .{
                 .any = .{
                     .commit = @ptrCast(&commit),
                 },
+                .name = name,
                 .registry = registry,
                 .userdata = userdata,
                 .methods = .{},
@@ -200,6 +209,11 @@ pub fn Class(comptime T: type) type {
             method.* = Method(T).fromName(name, options);
             self.methods.append(alloc, method) catch @panic("OOM");
             return method;
+        }
+
+        pub fn addMethodExplicit(self: *Self, method: *Method(T)) void {
+            const alloc = self.allocator();
+            self.methods.append(alloc, method) catch @panic("OOM");
         }
 
         /// Add a property by name.
@@ -346,7 +360,11 @@ pub fn Class(comptime T: type) type {
             if (self.level != level) return;
 
             // 1. Register the class itself
-            self.registerClass();
+            if (self.name.len == 0) {
+                self.registerClass();
+            } else {
+                self.registerClassWithName(StringName.fromUtf8(self.name));
+            }
 
             // 2. Resolve properties first (may create new methods for auto-detected getters/setters)
             for (self.ungrouped_properties.items) |property| {
@@ -394,8 +412,13 @@ pub fn Class(comptime T: type) type {
         };
 
         fn registerClass(self: *Self) void {
+            const class_name: StringName = .fromType(T);
+            self.registerClassWithName(class_name);
+        }
+
+        fn registerClassWithName(self: *Self, class_name: StringName) void {
             const Userdata = class_mod.ClassUserdataOf(T);
-            class_mod.registerClass(T, if (Userdata != void) .{
+            class_mod.registerClassWithName(T, if (Userdata != void) .{
                 .userdata = self.userdata,
                 .is_virtual = self.is_virtual,
                 .is_abstract = self.is_abstract,
@@ -408,7 +431,7 @@ pub fn Class(comptime T: type) type {
                 .is_exposed = self.is_exposed,
                 .is_runtime = self.is_runtime,
                 .icon_path = self.icon_path,
-            });
+            }, class_name);
         }
     };
 }
@@ -457,6 +480,37 @@ pub fn Method(comptime T: type) type {
                 .register_fn = &struct {
                     fn doRegister() void {
                         method_mod.registerMethod(T, config);
+                    }
+                }.doRegister,
+            };
+        }
+
+        pub fn fromFn(
+            comptime class_name_str: [:0]const u8,
+            comptime call_fn: anytype,
+            comptime config: method_mod.MethodConfig(T),
+        ) Self {
+            return .{
+                .name = config.name,
+                .return_info = config.return_value_info.?.*,
+                .arg_info = config.argument_info,
+                .register_fn = &struct {
+                    fn doRegister() void {
+                        std.debug.print("Registering custom class method {s} for {s}...\n", .{config.name, class_name_str});
+
+                        var custom_class_sn = StringName.fromUtf8(class_name_str);
+                        var custom_method_sn = StringName.fromUtf8(config.name);
+
+                        classdb.registerMethod(
+                            T, void, &custom_class_sn,
+                            .{
+                                .name = &custom_method_sn,
+                                .flags = .{ .method_flag_normal = true },
+                                .return_value_info = config.return_value_info,
+                                .argument_info = config.argument_info,
+                            },
+                            .{ .call = call_fn, },
+                        );
                     }
                 }.doRegister,
             };
@@ -589,7 +643,7 @@ pub fn Property(comptime T: type, comptime name: [:0]const u8) type {
                 .nil;
 
             // Register the property
-            const class_name: StringName = .fromType(T);
+            const class_name: StringName = .fromUtf8(self.class.name);
             var property_name: StringName = .fromLatin1(name, true);
 
             var getter_name: StringName = if (self.resolved_getter) |g| .fromLatin1(g.name, true) else .empty;
@@ -941,5 +995,5 @@ const StringName = gdzig.builtin.StringName;
 const Variant = gdzig.builtin.Variant;
 
 const class_mod = @import("class.zig");
-const method_mod = @import("method.zig");
+pub const method_mod = @import("method.zig");
 const InitializationLevel = @import("../extension.zig").InitializationLevel;
