@@ -20,6 +20,7 @@ pub const Variant = extern struct {
     /// Copies the value in, returning an owned Variant. This must be coupled with a call to `deinit`.
     pub fn init(comptime T: type, value: T) Variant {
         if (comptime T == Variant) return value;
+
         const tag = comptime Tag.forType(T);
 
         if (tag == .object) {
@@ -39,7 +40,7 @@ pub const Variant = extern struct {
                     },
                 },
             };
-        }
+        } else if (tag == Variant.Tag.nil) return Variant.nil;
 
         const variantFromType = getVariantFromTypeConstructor(tag);
         var result: Variant = undefined;
